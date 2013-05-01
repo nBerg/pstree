@@ -1,5 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include <fnmatch.h>
 
 #include "pstree.h"
 
@@ -7,12 +10,12 @@ int get_procs(struct proc_struct **procs) {
 	
 	DIR *proc_dir;
 	struct dirent *dir;
-	char pid[MAX_PROCS][MAX_PID_LENGTH + 1];
+	char pids[MAX_PROCS][MAX_PID_LENGTH + 1];
 
 	int i, num_procs = 0;
 
 	// Find all pids in /proc
-	proc_dir = open_dir("/proc");
+	proc_dir = opendir("/proc");
 	if (proc_dir == NULL) {
 		perror ("Error opening the /proc directory");
 		return -1;
@@ -20,7 +23,7 @@ int get_procs(struct proc_struct **procs) {
 
 	while ((dir = readdir(proc_dir)) != NULL) {
 		if (!fnmatch("[0-9]*", dir->d_name, 0)) {
-			snprintf(pids[i], sizeof(pid[i]), "%s", dir->d_name);
+			snprintf(pids[i], sizeof(pids[i]), "%s", dir->d_name);
 			++i;
 			++num_procs;
 		}
