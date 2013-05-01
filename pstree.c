@@ -32,6 +32,35 @@ int get_procs(struct proc_struct **procs) {
 	closedir(proc_dir);
 
 	// Fill in a proc_struct for each process
+	for (i = 1; i < num_procs; i++) {
+		FILE *stat_file;
+		char path[20], state;
+
+		snprintf(path, sizeof(path), "%s%s%s", "/proc/", pids[i], 
+								"/stat");
+		if ((stat_file = fopen(path, "r")) == NULL) {
+			// Error opening file, or process no longer exists
+			continue;
+		}
+
+		procs[i] = malloc(sizeof(struct proc_struct));
+		if (procs[i] == NULL) {
+			perror("Error with malloc");
+			return -1;
+		}
+
+		if (fscanf(stat_file, "%d %s %c %d", &procs[i]->pid,
+						procs[i]->proc_name,
+						&state,
+						&procs[i]->ppid) != 4) {
+			perror("Error reading stat_file");
+			return -1;
+		}
+
+		fclose(stat_file);
+	}
+
+	return num_procs;
 }
 
 
