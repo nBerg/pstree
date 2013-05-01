@@ -7,7 +7,7 @@
 #define MAX_PID_LENGTH 5
 
 struct proc_struct {
-	char proc_name[64];
+	char proc_name[256];
 	int pid;
 	int ppid;
 	struct proc_struct *child;

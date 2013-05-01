@@ -10,12 +10,12 @@
 static struct proc_struct *procs[MAX_PROCS];
 static int num_procs = 0;
 
-void init_proc_struct(struct proc_struct *p) {
+static void init_proc_struct(struct proc_struct *p) {
 	p->child = NULL;
 	p->sibling = NULL;
 }
 
-int create_root() {
+static int create_root() {
 	struct proc_struct *root = malloc(sizeof(struct proc_struct));
 	if (root == NULL) {
 		perror("Error with malloc");
@@ -31,13 +31,11 @@ int create_root() {
 	return 0;
 }
 
-int get_procs() {
-	
+static int get_pids(char pids[MAX_PROCS][MAX_PID_LENGTH + 1]) 
+{
 	DIR *proc_dir;
 	struct dirent *dir;
-	char pids[MAX_PROCS][MAX_PID_LENGTH + 1];
-
-	int i = 0;
+	int i = 1;  //pids[0] is a placeholder for the root process
 
 	// Find all pids in /proc
 	proc_dir = opendir("/proc");
@@ -46,7 +44,6 @@ int get_procs() {
 		return -1;
 	}
 
-	i = 1; // pids[0] is a placeholder for the root process
 	while ((dir = readdir(proc_dir)) != NULL) {
 		if (!fnmatch("[0-9]*", dir->d_name, 0)) {
 			snprintf(pids[i], sizeof(pids[i]), "%s", dir->d_name);
@@ -56,6 +53,38 @@ int get_procs() {
 	}
 
 	closedir(proc_dir);
+	return 0;
+}
+
+static int read_stats(char *pid, struct proc_struct *p)
+{
+	FILE *proc;
+	char buf[256];
+	char state;
+
+	snprintf(buf, sizeof(buf), "/proc/%s/stat", pid);
+	proc = fopen(buf, "r");
+
+	if (proc) {
+		if (4 != fscanf(proc, "%d %s %c %d", &p->pid, 
+						p->proc_name, 
+						&state, 
+						&p->ppid)) {
+			perror("Error reading from stat file");
+			return -1;
+		}
+		fclose(proc);
+	}
+
+	return 0;
+}
+
+static int get_procs() {
+	
+	char pids[MAX_PROCS][MAX_PID_LENGTH + 1];
+	int i;
+
+	if (get_pids(pids) < 0) return -1;
 
 	if (create_root() < 0) return -1;
 
@@ -65,13 +94,6 @@ int get_procs() {
 		char path[20], state;
 		int length;
 
-		snprintf(path, sizeof(path), "%s%s%s", "/proc/", pids[i], 
-								"/stat");
-		if ((stat_file = fopen(path, "r")) == NULL) {
-			// Error opening file, or process no longer exists
-			continue;
-		}
-
 		procs[i] = malloc(sizeof(struct proc_struct));
 		if (procs[i] == NULL) {
 			perror("Error with malloc");
@@ -79,26 +101,19 @@ int get_procs() {
 		}
 		init_proc_struct(procs[i]);
 
-		if (fscanf(stat_file, "%d %s %c %d", &procs[i]->pid,
-						procs[i]->proc_name,
-						&state,
-						&procs[i]->ppid) != 4) {
-			perror("Error reading stat_file");
-			return -1;
-		}
+		if (read_stats(pids[i], procs[i]) < 0) return -1;
 
 		//Fix proc_name
 		length = strlen(procs[i]->proc_name);
 		procs[i]->proc_name[0] = procs[i]->proc_name[1];
 		procs[i]->proc_name[length - 1] = 0;
 
-		fclose(stat_file);
 	}
 
 	return num_procs;
 }
 
-struct proc_struct *get_pid(int pid) {
+static struct proc_struct *get_pid(int pid) {
 	int i;
 	for (i = 0; i < num_procs; i++) {
 		if (procs[i]->pid == pid) return procs[i];
@@ -107,7 +122,7 @@ struct proc_struct *get_pid(int pid) {
 	return NULL;
 }
 
-int make_parent_child() {
+static int make_parent_child() {
 	int i;
 	struct proc_struct *parent, *sibling;
 
@@ -141,7 +156,7 @@ int make_parent_child() {
 	return 0;
 }
 
-void print_tree(struct proc_struct *root, int depth, int first) {
+static void print_tree(struct proc_struct *root, int depth, int first) {
 	int local_depth = depth;
 
 	// print this process
