@@ -6,18 +6,21 @@
 
 #include "pstree.h"
 
+static struct proc_struct *procs[MAX_PROCS];
+static int num_procs = 0;
+
 void init_proc_struct(struct proc_struct *p) {
 	p->child = NULL;
 	p->sibling = NULL;
 }
 
-int get_procs(struct proc_struct **procs) {
+int get_procs() {
 	
 	DIR *proc_dir;
 	struct dirent *dir;
 	char pids[MAX_PROCS][MAX_PID_LENGTH + 1];
 
-	int i, num_procs = 0;
+	int i = 0;
 
 	// Find all pids in /proc
 	proc_dir = opendir("/proc");
@@ -69,7 +72,7 @@ int get_procs(struct proc_struct **procs) {
 	return num_procs;
 }
 
-struct proc_struct *get_pid(int pid, struct proc_struct **procs, int num_procs) {
+struct proc_struct *get_pid(int pid) {
 	int i;
 	for (i = 0; i < num_procs; i++) {
 		if (procs[i]->pid == pid) return procs[i];
@@ -78,12 +81,12 @@ struct proc_struct *get_pid(int pid, struct proc_struct **procs, int num_procs) 
 	return NULL;
 }
 
-int make_parent_child(struct proc_struct **procs, int num_procs) {
+int make_parent_child() {
 	int i;
 	struct proc_struct *parent, *sibling;
 
 	for (i = 0; i < num_procs; i++) {
-		parent = get_pid(procs[i]->ppid, procs, num_procs);
+		parent = get_pid(procs[i]->ppid);
 
 		if (parent == NULL) {
 			if (procs[i]->ppid == 0) {
@@ -99,10 +102,10 @@ int make_parent_child(struct proc_struct **procs, int num_procs) {
 			parent->child = procs[i];
 		} else {
 			// Find a sibling and add as a sibling
-			sibling = get_pid(parent->child->pid, procs, num_procs);
+			sibling = get_pid(parent->child->pid);
 
 			while (sibling->sibling != NULL) {
-				sibling = get_pid(sibling->sibling->pid, procs, num_procs);
+				sibling = get_pid(sibling->sibling->pid);
 			}
 
 			sibling->sibling = procs[i];
@@ -112,7 +115,7 @@ int make_parent_child(struct proc_struct **procs, int num_procs) {
 	return 0;
 }
 
-void print_tree(struct proc_struct **procs, int num_procs) {
+void print_tree() {
 	int i;
 	for (i = 0; i < num_procs; i++) {
 		printf("PID: %d\n", procs[i]->pid);
@@ -121,25 +124,26 @@ void print_tree(struct proc_struct **procs, int num_procs) {
 
 int main(int argc, char *argv[])
 {
-	struct proc_struct *procs[MAX_PROCS];
-	int num_procs;
+	int i;
 
 	// Get cmd line options TODO
 
 	// Get list of processes
-	if ((num_procs = get_procs(procs)) < 0) {
+	if ((num_procs = get_procs()) < 0) {
 		return EXIT_FAILURE;
 	}
 
 	// Create parent/child relationships
-	if (make_parent_child(procs, num_procs) < 0) {
+	if (make_parent_child() < 0) {
 		return EXIT_FAILURE;
 	}
 
 	// Print Tree
 //	print_tree(procs, num_procs);
 
-	// TODO: Free procs
+	for (i = 0; i < num_procs; i++) {
+		free(procs[i]);
+	}
 
 	return EXIT_SUCCESS;
 }
