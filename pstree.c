@@ -141,7 +141,7 @@ int make_parent_child() {
 	return 0;
 }
 
-void print_tree(struct proc_struct *root, int depth) {
+void print_tree(struct proc_struct *root, int depth, int first) {
 	int local_depth = depth;
 
 	// print this process
@@ -152,20 +152,30 @@ void print_tree(struct proc_struct *root, int depth) {
 
 	// print children
 	if (root->child != NULL) {
-		print_tree(root->child, depth + 1);
+		print_tree(root->child, depth + 1, 0);
 	}
 
 	// print siblings
-	if (root->sibling != NULL) {
-		print_tree(root->sibling, depth);
+	if (root->sibling != NULL && !first) {
+		print_tree(root->sibling, depth, 0);
 	}
 }
 
 int main(int argc, char *argv[])
 {
-	int i;
+	int i, start_pid = 0, depth, input;
+	struct proc_struct *root;
 
-	// Get cmd line options TODO
+	// Get cmd line options
+	if (argc > 1) {
+		input = atoi(argv[1]);	
+		if (input == 0) {
+			printf("Error: Invalid input\n");
+			return EXIT_FAILURE;
+		} else {
+			start_pid = input;
+		}
+	}
 
 	// Get list of processes
 	if ((num_procs = get_procs()) < 0) {
@@ -178,7 +188,15 @@ int main(int argc, char *argv[])
 	}
 
 	// Print Tree
-	print_tree(procs[0], -1);
+	if (start_pid == 0) depth = -1;
+	else depth = 0;
+
+	if((root = get_pid(start_pid)) == NULL) {
+		printf("Error: PID %d could not be found\n", start_pid);
+		return EXIT_FAILURE;
+	}
+
+	print_tree(root, depth, 1);
 
 	for (i = 0; i < num_procs; i++) {
 		free(procs[i]);
