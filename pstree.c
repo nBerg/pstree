@@ -91,7 +91,7 @@ static int get_procs() {
 	// Fill in a proc_struct for each process
 	for (i = 1; i < num_procs; i++) {
 		FILE *stat_file;
-		char path[20], state;
+		char path[20], state, *name;
 		int length;
 
 		procs[i] = malloc(sizeof(struct proc_struct));
@@ -104,10 +104,12 @@ static int get_procs() {
 		if (read_stats(pids[i], procs[i]) < 0) return -1;
 
 		//Fix proc_name
-		length = strlen(procs[i]->proc_name);
-		procs[i]->proc_name[0] = procs[i]->proc_name[1];
-		procs[i]->proc_name[length - 1] = 0;
+		name = procs[i]->proc_name;
+		name++;
+		length = strlen(name);
+		name[length - 1] = 0;
 
+		strncpy(procs[i]->proc_name, name, sizeof(procs[i]->proc_name));
 	}
 
 	return num_procs;
