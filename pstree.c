@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <fnmatch.h>
+#include <string.h>
 
 #include "pstree.h"
 
@@ -12,6 +13,22 @@ static int num_procs = 0;
 void init_proc_struct(struct proc_struct *p) {
 	p->child = NULL;
 	p->sibling = NULL;
+}
+
+int create_root() {
+	struct proc_struct *root = malloc(sizeof(struct proc_struct));
+	if (root == NULL) {
+		perror("Error with malloc");
+		return -1;
+	}
+
+	init_proc_struct(root);
+	root->pid = 0;
+
+	procs[0] = root;
+	++num_procs;
+
+	return 0;
 }
 
 int get_procs() {
@@ -29,6 +46,7 @@ int get_procs() {
 		return -1;
 	}
 
+	i = 1; // pids[0] is a placeholder for the root process
 	while ((dir = readdir(proc_dir)) != NULL) {
 		if (!fnmatch("[0-9]*", dir->d_name, 0)) {
 			snprintf(pids[i], sizeof(pids[i]), "%s", dir->d_name);
@@ -39,10 +57,13 @@ int get_procs() {
 
 	closedir(proc_dir);
 
+	if (create_root() < 0) return -1;
+
 	// Fill in a proc_struct for each process
-	for (i = 0; i < num_procs; i++) {
+	for (i = 1; i < num_procs; i++) {
 		FILE *stat_file;
 		char path[20], state;
+		int length;
 
 		snprintf(path, sizeof(path), "%s%s%s", "/proc/", pids[i], 
 								"/stat");
@@ -66,6 +87,11 @@ int get_procs() {
 			return -1;
 		}
 
+		//Fix proc_name
+		length = strlen(procs[i]->proc_name);
+		procs[i]->proc_name[0] = procs[i]->proc_name[1];
+		procs[i]->proc_name[length - 1] = 0;
+
 		fclose(stat_file);
 	}
 
@@ -85,7 +111,7 @@ int make_parent_child() {
 	int i;
 	struct proc_struct *parent, *sibling;
 
-	for (i = 0; i < num_procs; i++) {
+	for (i = 1; i < num_procs; i++) {
 		parent = get_pid(procs[i]->ppid);
 
 		if (parent == NULL) {
@@ -115,11 +141,24 @@ int make_parent_child() {
 	return 0;
 }
 
-void print_tree() {
-	int i;
-	for (i = 0; i < num_procs; i++) {
-		printf("PID: %d\n", procs[i]->pid);
-	}	
+void print_tree(struct proc_struct *root, int depth) {
+	int local_depth = depth;
+
+	// print this process
+	if (root->pid != 0) {
+		while (local_depth-- > 0) printf("\t");
+		printf("%s (%d)\n", root->proc_name, root->pid);
+	}
+
+	// print children
+	if (root->child != NULL) {
+		print_tree(root->child, depth + 1);
+	}
+
+	// print siblings
+	if (root->sibling != NULL) {
+		print_tree(root->sibling, depth);
+	}
 }
 
 int main(int argc, char *argv[])
@@ -139,7 +178,7 @@ int main(int argc, char *argv[])
 	}
 
 	// Print Tree
-//	print_tree(procs, num_procs);
+	print_tree(procs[0], -1);
 
 	for (i = 0; i < num_procs; i++) {
 		free(procs[i]);
