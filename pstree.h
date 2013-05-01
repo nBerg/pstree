@@ -10,8 +10,8 @@ struct proc_struct {
 	char proc_name[64];
 	int pid;
 	int ppid;
-
-	//Something for children
+	struct proc_struct *child;
+	struct proc_struct *sibling;
 };
 
 #endif
