@@ -132,12 +132,13 @@ static int make_parent_child() {
 		parent = get_pid(procs[i]->ppid);
 
 		if (parent == NULL) {
-			if (procs[i]->ppid == 0) {
-				//root processes
-				continue;
+			// Parent may have terminated already, reparent
+			if ((parent = get_pid(1)) == NULL) {
+				if ((parent = get_pid(0)) == NULL) {
+					printf("Error creating parent/child relationships");
+					return -1;
+				}
 			}
-			printf("Error creating parent/child relationships");
-			return -1;
 		}
 
 		if (parent->child == NULL) {
